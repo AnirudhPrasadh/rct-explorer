@@ -1398,10 +1398,10 @@ function buildInvestigatorList() {
     r._name_clean  = name;
   });
 
-  allInvestigators = [...invSeen].sort((a,b) => a.localeCompare(b));
-  allInstitutions  = [...instSeen].sort((a,b) => a.localeCompare(b));
-  allPrivateInvestigators = [...privInvSeen].sort((a,b) => a.localeCompare(b));
-  allPrivateInstitutions  = [...privInstSeen].sort((a,b) => a.localeCompare(b));
+  allInvestigators = [...invSeen].map(s => s.trim()).filter(Boolean).sort((a,b) => a.localeCompare(b));
+  allInstitutions  = [...instSeen].map(s => s.trim()).filter(Boolean).sort((a,b) => a.localeCompare(b));
+  allPrivateInvestigators = [...privInvSeen].map(s => s.trim()).filter(Boolean).sort((a,b) => a.localeCompare(b));
+  allPrivateInstitutions  = [...privInstSeen].map(s => s.trim()).filter(Boolean).sort((a,b) => a.localeCompare(b));
 }
 
 // Generic autocomplete renderer
@@ -1462,8 +1462,8 @@ function onInstitutionSearch() {
   }
 }
 function selectInstitution(name) {
-  document.getElementById('institution-input').value = name;
-  state.institutionQuery = name.toLowerCase();
+  document.getElementById('institution-input').value = name.trim();
+  state.institutionQuery = name.trim().toLowerCase();
   state.page = 1;
   document.getElementById('inst-dropdown').style.display = 'none';
   updateAll();
@@ -1508,8 +1508,8 @@ function onPrivateInstSearch() {
   }
 }
 function selectPrivateInstitution(name) {
-  document.getElementById('private-institution-input').value = name;
-  state.privateInstQuery = name.toLowerCase();
+  document.getElementById('private-institution-input').value = name.trim();
+  state.privateInstQuery = name.trim().toLowerCase();
   state.privatePage = 1;
   document.getElementById('private-inst-dropdown').style.display = 'none';
   updatePrivate();
@@ -1588,9 +1588,10 @@ function applyFiltersExceptSector(records) {
       if (!queryWords.every(qw => nameWords.some(w => w.startsWith(qw)))) return false;
     }
     if (state.institutionQuery) {
-      const q = state.institutionQuery;
       const inst = (r._institution || extractInstitution(r.investigator || '') || '').toLowerCase();
-      if (!inst.split(/\s+/).some(w => w.startsWith(q))) return false;
+      const instWords = inst.split(/\s+/);
+      const queryWords = state.institutionQuery.trim().split(/\s+/);
+      if (!queryWords.every(qw => instWords.some(w => w.startsWith(qw)))) return false;
     }
     return true;
   });
@@ -1645,9 +1646,10 @@ function applyFilters(records) {
     }
     // Institution
     if (state.institutionQuery) {
-      const q = state.institutionQuery;
       const inst = (r._institution || extractInstitution(r.investigator || '') || '').toLowerCase();
-      if (!inst.split(/\s+/).some(w => w.startsWith(q))) return false;
+      const instWords = inst.split(/\s+/);
+      const queryWords = state.institutionQuery.trim().split(/\s+/);
+      if (!queryWords.every(qw => instWords.some(w => w.startsWith(qw)))) return false;
     }
     return true;
   });
@@ -1833,7 +1835,9 @@ function updatePrivate() {
     const q = state.privateInstQuery;
     records = records.filter(r => {
       const inst = (r._institution || extractInstitution(r.investigator || '') || '').toLowerCase();
-      return inst.split(/\s+/).some(w => w.startsWith(q));
+      const instWords = inst.split(/\s+/);
+      const queryWords = q.trim().split(/\s+/);
+      return queryWords.every(qw => instWords.some(w => w.startsWith(qw)));
     });
   }
 
