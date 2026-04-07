@@ -1,0 +1,1879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RCT Explorer — Global Evidence Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #0e0f11;
+    --bg2:       #141518;
+    --bg3:       #1c1e22;
+    --border:    #2a2d33;
+    --border2:   #383c44;
+    --text:      #e8e9eb;
+    --text2:     #8a8f9a;
+    --text3:     #555b66;
+    --accent:    #7fffd4;       /* aquamarine — nod to Wanderword teal */
+    --accent2:   #3dd9ac;
+    --warn:      #f5a623;
+    --danger:    #e05c5c;
+    --map-0:     #1c1e22;
+    --map-1:     #1a3a35;
+    --map-2:     #1e5c4e;
+    --map-3:     #237d69;
+    --map-4:     #29a084;
+    --map-5:     #2ec4a0;
+    --map-6:     #7fffd4;
+    --private:   #4a3f6b;
+    --mono:      'Space Mono', monospace;
+    --sans:      'DM Sans', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    overflow: hidden;
+  }
+
+  /* ── LAYOUT ── */
+  #app { display: flex; flex-direction: column; height: 100vh; }
+
+  /* ── HEADER ── */
+  #header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px;
+    height: 52px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    flex-shrink: 0;
+    z-index: 100;
+  }
+  #logo {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    display: flex; align-items: center; gap: 10px;
+  }
+  #logo::before {
+    content: '>';
+    color: var(--text3);
+  }
+  #logo-sub {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: 0.1em;
+    margin-top: 2px;
+  }
+  #header-right {
+    display: flex; align-items: center; gap: 20px;
+  }
+  .stat-pill {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text2);
+    letter-spacing: 0.08em;
+  }
+  .stat-pill span {
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  /* ── MODE TOGGLE ── */
+  #mode-toggle {
+    display: flex;
+    border: 1px solid var(--border2);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .mode-btn {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    padding: 6px 14px;
+    background: transparent;
+    color: var(--text3);
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .mode-btn.active {
+    background: var(--accent);
+    color: var(--bg);
+    font-weight: 700;
+  }
+  .mode-btn:hover:not(.active) { color: var(--text); background: var(--bg3); }
+
+  /* ── MAIN BODY ── */
+  #body { display: flex; flex: 1; overflow: hidden; }
+
+  /* ── LEFT PANEL ── */
+  #left-panel {
+    width: 280px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  .panel-section {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .panel-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    color: var(--text3);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+  }
+
+  /* ── FILTERS ── */
+  #filter-scroll { overflow-y: auto; flex: 1; }
+  #filter-scroll::-webkit-scrollbar { width: 3px; }
+  #filter-scroll::-webkit-scrollbar-thumb { background: var(--border2); }
+
+  .sector-chip {
+    display: inline-flex;
+    align-items: center;
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    padding: 4px 9px;
+    margin: 3px 3px 3px 0;
+    border: 1px solid var(--border2);
+    border-radius: 2px;
+    color: var(--text2);
+    cursor: pointer;
+    transition: all 0.12s;
+    background: transparent;
+  }
+  .sector-chip:hover { border-color: var(--accent); color: var(--accent); }
+  .sector-chip.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+    font-weight: 700;
+  }
+  .sector-chip .chip-count {
+    margin-left: 5px;
+    opacity: 0.6;
+    font-size: 8px;
+  }
+
+  /* ── YEAR FILTER ── */
+  #year-range {
+    display: flex; gap: 8px; align-items: center;
+  }
+  .year-input {
+    width: 70px;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 5px 8px;
+    border-radius: 2px;
+    outline: none;
+  }
+  .year-input:focus { border-color: var(--accent); }
+  .year-sep { color: var(--text3); font-family: var(--mono); font-size: 11px; }
+
+  /* ── STATUS FILTER ── */
+  .status-row {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 6px; cursor: pointer;
+  }
+  .status-check {
+    width: 12px; height: 12px;
+    border: 1px solid var(--border2);
+    border-radius: 1px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.12s;
+  }
+  .status-check.checked {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  .status-check.checked::after {
+    content: '✓';
+    font-size: 8px;
+    color: var(--bg);
+    font-weight: 700;
+  }
+  .status-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text2);
+    letter-spacing: 0.05em;
+  }
+  .status-dot {
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+  }
+
+  /* ── ACTIVE COUNTRY ── */
+  #country-badge {
+    display: none;
+    align-items: center; justify-content: space-between;
+    padding: 10px 20px;
+    background: var(--bg3);
+    border-bottom: 1px solid var(--border);
+  }
+  #country-badge.visible { display: flex; }
+  #country-name-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+  }
+  #country-clear {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text3);
+    cursor: pointer;
+    background: none; border: none;
+    letter-spacing: 0.06em;
+  }
+  #country-clear:hover { color: var(--danger); }
+
+  /* ── RESET ── */
+  #reset-btn {
+    margin: 14px 20px;
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    padding: 7px 12px;
+    background: transparent;
+    border: 1px solid var(--border2);
+    color: var(--text3);
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.12s;
+    width: calc(100% - 40px);
+  }
+  #reset-btn:hover { border-color: var(--danger); color: var(--danger); }
+
+  /* ── MAP ── */
+  #map-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+
+  #map-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+
+  #map-svg {
+    width: 100%; height: 100%;
+  }
+
+  .country-path {
+    stroke: #2a2d33;
+    stroke-width: 0.5px;
+    cursor: pointer;
+    transition: fill 0.2s;
+  }
+  .country-path:hover { stroke: var(--accent); stroke-width: 1px; }
+  .country-path.selected { stroke: var(--accent); stroke-width: 1.5px; }
+
+  /* ── TOOLTIP ── */
+  #tooltip {
+    position: fixed;
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    padding: 10px 14px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.1s;
+    z-index: 1000;
+    max-width: 220px;
+  }
+  #tooltip.visible { opacity: 1; }
+  #tooltip-country {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    margin-bottom: 4px;
+  }
+  #tooltip-count {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text2);
+    letter-spacing: 0.04em;
+  }
+  #tooltip-breakdown {
+    margin-top: 6px;
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text3);
+    letter-spacing: 0.04em;
+    line-height: 1.6;
+  }
+
+  /* ── COUNT BAR (bottom of map) ── */
+  #count-bar {
+    height: 32px;
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center;
+    padding: 0 20px;
+    gap: 20px;
+    background: var(--bg);
+    flex-shrink: 0;
+  }
+  .count-stat {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: 0.06em;
+  }
+  .count-stat span { color: var(--text); }
+
+  /* ── LEGEND ── */
+  #legend {
+    position: absolute;
+    bottom: 40px;
+    right: 20px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    padding: 10px 14px;
+  }
+  #legend-title {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text3);
+    letter-spacing: 0.1em;
+    margin-bottom: 8px;
+  }
+  .legend-row {
+    display: flex; align-items: center; gap: 7px;
+    margin-bottom: 4px;
+  }
+  .legend-swatch { width: 18px; height: 10px; flex-shrink: 0; }
+  .legend-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text2);
+    letter-spacing: 0.04em;
+  }
+
+  /* ── RIGHT PANEL (TABLE) ── */
+  #right-panel {
+    width: 380px;
+    flex-shrink: 0;
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  #table-header {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  #table-title {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text2);
+    letter-spacing: 0.08em;
+  }
+  #table-count-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+  }
+
+  /* ── SEARCH ── */
+  #search-wrap {
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  #search-input {
+    width: 100%;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 7px 10px 7px 28px;
+    border-radius: 2px;
+    outline: none;
+    letter-spacing: 0.04em;
+  }
+  #search-input:focus { border-color: var(--accent); }
+  #search-input::placeholder { color: var(--text3); }
+  #search-wrap {
+    position: relative;
+  }
+  #search-icon {
+    position: absolute;
+    left: 30px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--text3);
+    font-size: 11px;
+    pointer-events: none;
+  }
+
+  /* ── TABLE ROWS ── */
+  #table-scroll {
+    flex: 1;
+    overflow-y: auto;
+  }
+  #table-scroll::-webkit-scrollbar { width: 3px; }
+  #table-scroll::-webkit-scrollbar-thumb { background: var(--border2); }
+
+  .rct-row {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .rct-row:hover { background: var(--bg3); }
+  .rct-row.expanded { background: var(--bg3); border-left: 2px solid var(--accent); }
+
+  .rct-id {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text3);
+    letter-spacing: 0.06em;
+    margin-bottom: 4px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .rct-title {
+    font-size: 12px;
+    color: var(--text);
+    line-height: 1.4;
+    margin-bottom: 6px;
+    font-weight: 400;
+  }
+  .rct-meta {
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+  .meta-tag {
+    font-family: var(--mono);
+    font-size: 8px;
+    letter-spacing: 0.05em;
+    padding: 2px 6px;
+    border: 1px solid var(--border2);
+    color: var(--text3);
+    border-radius: 1px;
+  }
+  .meta-tag.completed { border-color: #2a6b4a; color: #5abf8a; }
+  .meta-tag.on_going  { border-color: #4a5c2a; color: #a0bf5a; }
+  .meta-tag.in_development { border-color: #2a3d6b; color: #5a8abf; }
+  .meta-tag.withdrawn { border-color: #6b2a2a; color: #bf5a5a; }
+
+  /* ── EXPANDED DETAIL ── */
+  .rct-detail {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    display: none;
+  }
+  .rct-row.expanded .rct-detail { display: block; }
+  .detail-row {
+    display: flex; gap: 8px;
+    margin-bottom: 7px;
+    font-size: 11px;
+  }
+  .detail-key {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text3);
+    letter-spacing: 0.06em;
+    min-width: 80px;
+    flex-shrink: 0;
+    padding-top: 1px;
+  }
+  .detail-val {
+    color: var(--text2);
+    line-height: 1.4;
+    font-size: 11px;
+  }
+  .detail-val a {
+    color: var(--accent);
+    text-decoration: none;
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.04em;
+  }
+  .detail-val a:hover { text-decoration: underline; }
+  .kw-list { display: flex; flex-wrap: wrap; gap: 4px; }
+  .kw-tag {
+    font-family: var(--mono);
+    font-size: 8px;
+    padding: 2px 6px;
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    color: var(--text3);
+    border-radius: 1px;
+    letter-spacing: 0.04em;
+  }
+
+  /* ── PAGINATION ── */
+  #pagination {
+    padding: 10px 20px;
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .page-btn {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 5px 10px;
+    background: transparent;
+    border: 1px solid var(--border2);
+    color: var(--text2);
+    cursor: pointer;
+    letter-spacing: 0.06em;
+    border-radius: 2px;
+    transition: all 0.12s;
+  }
+  .page-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .page-btn:disabled { opacity: 0.3; cursor: default; }
+  #page-info {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text3);
+    letter-spacing: 0.06em;
+  }
+
+  /* ── PRIVATE MODE ── */
+  #private-view {
+    display: none;
+    flex: 1;
+    overflow: hidden;
+    flex-direction: column;
+  }
+  #private-view.visible { display: flex; }
+
+  #private-sectors {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .private-sector-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    padding: 7px 14px;
+    margin: 4px 4px 4px 0;
+    border: 1px solid var(--border2);
+    border-radius: 2px;
+    color: var(--text2);
+    cursor: pointer;
+    background: transparent;
+    transition: all 0.12s;
+  }
+  .private-sector-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .private-sector-btn.active {
+    background: var(--private);
+    border-color: #7b6aaa;
+    color: #c8b8ff;
+    font-weight: 700;
+  }
+  .private-count {
+    font-size: 9px;
+    opacity: 0.6;
+  }
+
+  #private-table-wrap {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 10px;
+    color: var(--text3);
+  }
+  .empty-state-icon { font-size: 24px; opacity: 0.3; }
+  .empty-state-text {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-align: center;
+  }
+
+  /* ── LOADING ── */
+  #loading {
+    position: fixed; inset: 0;
+    background: var(--bg);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 9999;
+    gap: 16px;
+  }
+  #loading.hidden { display: none; }
+  #loading-text {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text3);
+    letter-spacing: 0.1em;
+    animation: blink 1.2s infinite;
+  }
+  #loading-logo {
+    font-family: var(--mono);
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* ── SCROLLBAR GLOBAL ── */
+  * { scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div id="loading-logo">> RCT EXPLORER</div>
+  <div id="loading-text">Loading global evidence data...</div>
+</div>
+
+<div id="app">
+
+  <!-- HEADER -->
+  <div id="header">
+    <div>
+      <div id="logo">RCT EXPLORER</div>
+    </div>
+    <div id="mode-toggle">
+      <button class="mode-btn active" data-mode="country" onclick="setMode('country')">Country Studies</button>
+      <button class="mode-btn" data-mode="private" onclick="setMode('private')">Private Studies</button>
+    </div>
+    <div id="header-right">
+      <div class="stat-pill">Total RCTs: <span id="stat-total">—</span></div>
+      <div class="stat-pill">Countries: <span id="stat-countries">—</span></div>
+      <div class="stat-pill">Last updated: <span id="stat-updated">—</span></div>
+      <div class="stat-pill">Source: <a href="https://www.socialscienceregistry.org/" target="_blank" style="color:var(--accent);text-decoration:none;font-family:var(--mono);font-size:10px;">AEA Registry ↗</a></div>
+      <button id="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode"
+        style="font-family:var(--mono);font-size:11px;padding:5px 10px;background:transparent;border:1px solid var(--border2);color:var(--text2);cursor:pointer;border-radius:2px;transition:all 0.15s;letter-spacing:0.04em;">
+        ◐
+      </button>
+    </div>
+  </div>
+
+  <!-- BODY -->
+  <div id="body">
+
+    <!-- LEFT PANEL -->
+    <div id="left-panel">
+      <div id="filter-scroll">
+
+        <!-- SECTOR FILTER -->
+        <div class="panel-section">
+          <div class="panel-label">Sector Filter</div>
+          <div id="sector-chips"></div>
+        </div>
+
+        <!-- STATUS FILTER -->
+        <div class="panel-section">
+          <div class="panel-label">Status</div>
+          <div id="status-filters"></div>
+        </div>
+
+        <!-- YEAR FILTER -->
+        <div class="panel-section">
+          <div class="panel-label">Year Registered</div>
+          <div id="year-range">
+            <input class="year-input" id="year-from" type="number" placeholder="2013" min="2013" max="2023">
+            <span class="year-sep">—</span>
+            <input class="year-input" id="year-to" type="number" placeholder="2023" min="2013" max="2023">
+          </div>
+        </div>
+
+      </div>
+
+      <button id="reset-btn" onclick="resetFilters()">Reset All Filters</button>
+    </div>
+
+    <!-- MAP + TABLE (COUNTRY MODE) -->
+    <div id="country-view" style="display:flex;flex:1;overflow:hidden;">
+
+      <!-- MAP -->
+      <div id="map-container">
+        <div id="country-badge">
+          <span id="country-name-label"></span>
+          <button id="country-clear" onclick="clearCountryFilter()">✕ Clear</button>
+        </div>
+        <div id="map-wrap">
+          <svg id="map-svg"></svg>
+          <div id="legend">
+            <div id="legend-title">RCT Count</div>
+            <div id="legend-rows"></div>
+          </div>
+        </div>
+        <div id="count-bar">
+          <div class="count-stat">Showing: <span id="bar-showing">—</span> RCTs</div>
+          <div class="count-stat">Countries: <span id="bar-countries">—</span></div>
+          <div class="count-stat">Multi-country: <span id="bar-multi">—</span></div>
+        </div>
+      </div>
+
+      <!-- TABLE -->
+      <div id="right-panel">
+        <div id="table-header">
+          <span id="table-title">Study Index</span>
+          <span id="table-count-label"></span>
+        </div>
+        <div id="search-wrap">
+          <span id="search-icon">⌕</span>
+          <input id="search-input" type="text" placeholder="Search title or ID..." oninput="onSearch()">
+        </div>
+        <div id="inv-wrap" style="padding:0 20px 6px;position:relative;">
+          <span style="position:absolute;left:30px;top:42%;transform:translateY(-50%);color:var(--text3);font-size:11px;pointer-events:none;">👤</span>
+          <input id="investigator-input" type="text" autocomplete="off"
+            placeholder="Search by investigator..."
+            oninput="onInvestigatorSearch()"
+            onfocus="showInvDropdown()"
+            onblur="hideInvDropdown()"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:11px;padding:7px 10px 7px 28px;border-radius:2px;outline:none;letter-spacing:0.04em;">
+          <div id="inv-dropdown"
+            style="display:none;position:absolute;left:20px;right:20px;top:calc(100% - 2px);background:var(--bg2);border:1px solid var(--border2);border-top:none;max-height:200px;overflow-y:auto;z-index:500;">
+          </div>
+        </div>
+        <div id="inst-wrap" style="padding:0 20px 10px;border-bottom:1px solid var(--border);position:relative;">
+          <span style="position:absolute;left:30px;top:42%;transform:translateY(-50%);color:var(--text3);font-size:11px;pointer-events:none;">🏛</span>
+          <input id="institution-input" type="text" autocomplete="off"
+            placeholder="Search by institution..."
+            oninput="onInstitutionSearch()"
+            onfocus="showInstDropdown()"
+            onblur="hideInstDropdown()"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:11px;padding:7px 10px 7px 28px;border-radius:2px;outline:none;letter-spacing:0.04em;">
+          <div id="inst-dropdown"
+            style="display:none;position:absolute;left:20px;right:20px;top:calc(100% - 2px);background:var(--bg2);border:1px solid var(--border2);border-top:none;max-height:200px;overflow-y:auto;z-index:500;">
+          </div>
+        </div>
+        <div id="table-scroll"></div>
+        <div id="pagination">
+          <button class="page-btn" id="prev-btn" onclick="changePage(-1)">← Prev</button>
+          <span id="page-info"></span>
+          <button class="page-btn" id="next-btn" onclick="changePage(1)">Next →</button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- PRIVATE MODE VIEW -->
+    <div id="private-view">
+      <div id="private-sectors">
+        <div class="panel-label" style="margin-bottom:12px;">Private Studies — Location confidential. Browse by sector.</div>
+        <div id="private-sector-btns"></div>
+      </div>
+      <div id="private-table-wrap">
+        <div id="table-header" style="padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+          <span id="private-table-title" style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.08em;">Private Study Index</span>
+          <span id="private-count-label" style="font-family:var(--mono);font-size:10px;color:#c8b8ff;letter-spacing:0.06em;"></span>
+        </div>
+        <div id="search-wrap" style="padding:10px 20px 6px;border-bottom:none;position:relative;">
+          <span id="search-icon">⌕</span>
+          <input id="private-search" type="text" class="search-input" placeholder="Search private studies..." 
+            style="width:100%;background:var(--bg3);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:11px;padding:7px 10px 7px 28px;border-radius:2px;outline:none;letter-spacing:0.04em;"
+            oninput="onPrivateSearch()">
+        </div>
+        <div style="padding:0 20px 6px;position:relative;">
+          <span style="position:absolute;left:30px;top:42%;transform:translateY(-50%);color:var(--text3);font-size:11px;pointer-events:none;">👤</span>
+          <input id="private-investigator-input" type="text" autocomplete="off"
+            placeholder="Search by investigator..."
+            oninput="onPrivateInvSearch()"
+            onfocus="showPrivateInvDropdown()"
+            onblur="hidePrivateInvDropdown()"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:11px;padding:7px 10px 7px 28px;border-radius:2px;outline:none;letter-spacing:0.04em;">
+          <div id="private-inv-dropdown"
+            style="display:none;position:absolute;left:20px;right:20px;top:calc(100% - 2px);background:var(--bg2);border:1px solid var(--border2);border-top:none;max-height:180px;overflow-y:auto;z-index:500;">
+          </div>
+        </div>
+        <div style="padding:0 20px 10px;border-bottom:1px solid var(--border);position:relative;">
+          <span style="position:absolute;left:30px;top:42%;transform:translateY(-50%);color:var(--text3);font-size:11px;pointer-events:none;">🏛</span>
+          <input id="private-institution-input" type="text" autocomplete="off"
+            placeholder="Search by institution..."
+            oninput="onPrivateInstSearch()"
+            onfocus="showPrivateInstDropdown()"
+            onblur="hidePrivateInstDropdown()"
+            style="width:100%;background:var(--bg3);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:11px;padding:7px 10px 7px 28px;border-radius:2px;outline:none;letter-spacing:0.04em;">
+          <div id="private-inst-dropdown"
+            style="display:none;position:absolute;left:20px;right:20px;top:calc(100% - 2px);background:var(--bg2);border:1px solid var(--border2);border-top:none;max-height:180px;overflow-y:auto;z-index:500;">
+          </div>
+        </div>
+        </div>
+        <div id="private-table-scroll" style="flex:1;overflow-y:auto;"></div>
+        <div id="private-pagination" style="padding:10px 20px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+          <button class="page-btn" id="private-prev-btn" onclick="changePrivatePage(-1)">← Prev</button>
+          <span id="private-page-info" style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:0.06em;"></span>
+          <button class="page-btn" id="private-next-btn" onclick="changePrivatePage(1)">Next →</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="tooltip">
+  <div id="tooltip-country"></div>
+  <div id="tooltip-count"></div>
+  <div id="tooltip-breakdown"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script>
+// ── STATE ───────────────────────────────────────────────────────────────────
+const state = {
+  mode: 'country',
+  data: null,
+  selectedSectors: new Set(),
+  selectedStatuses: new Set(['completed', 'on_going', 'in_development', 'withdrawn', 'abandoned']),
+  selectedCountry: null,
+  yearFrom: null,
+  yearTo: null,
+  searchQuery: '',
+  investigatorQuery: '',
+  institutionQuery: '',
+  page: 1,
+  pageSize: 20,
+  expandedRow: null,
+  // private mode
+  privateSelectedSector: null,
+  privatePage: 1,
+  privateSearch: '',
+  privateInvQuery: '',
+  privateInstQuery: '',
+};
+
+// ── DATA FETCH ───────────────────────────────────────────────────────────────
+const DATA_URL = 'data/rct_viz_data.json';
+const GEO_URL  = 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json';
+
+async function init() {
+  try {
+    const [rctData, topoData] = await Promise.all([
+      fetch(DATA_URL).then(r => r.json()),
+      fetch(GEO_URL).then(r => r.json()),
+    ]);
+
+    state.data = rctData;
+    buildUI();
+    buildInvestigatorList();
+    buildMap(topoData);
+    updateAll();
+    document.getElementById('loading').classList.add('hidden');
+  } catch(e) {
+    document.getElementById('loading-text').textContent = 'ERROR: ' + e.message;
+  }
+}
+
+// ── BUILD UI ─────────────────────────────────────────────────────────────────
+function buildUI() {
+  const { meta, sectors } = state.data;
+
+  // Header stats
+  document.getElementById('stat-total').textContent = meta.total_rcts.toLocaleString();
+  document.getElementById('stat-countries').textContent = meta.total_countries;
+  document.getElementById('stat-updated').textContent = meta.last_updated;
+
+  // Sector chips
+  const chips = document.getElementById('sector-chips');
+  sectors.forEach(s => {
+    const chip = document.createElement('button');
+    chip.className = 'sector-chip';
+    chip.dataset.sector = s.name;
+    chip.innerHTML = `${s.name.replace(/_/g,' ')} <span class="chip-count">${s.count}</span>`;
+    chip.onclick = () => toggleSector(s.name);
+    chips.appendChild(chip);
+  });
+
+  // Status filters
+  const statuses = [
+    { key: 'completed',      label: 'Completed',      color: '#5abf8a' },
+    { key: 'on_going',       label: 'Ongoing',        color: '#a0bf5a' },
+    { key: 'in_development', label: 'In Development',  color: '#5a8abf' },
+    { key: 'withdrawn',      label: 'Withdrawn',       color: '#bf5a5a' },
+  ];
+  const sf = document.getElementById('status-filters');
+  statuses.forEach(s => {
+    const row = document.createElement('div');
+    row.className = 'status-row';
+    row.onclick = () => toggleStatus(s.key);
+    row.innerHTML = `
+      <div class="status-check checked" id="check-${s.key}"></div>
+      <div class="status-dot" style="background:${s.color}"></div>
+      <span class="status-label">${s.label}</span>`;
+    sf.appendChild(row);
+  });
+
+  // Year inputs
+  document.getElementById('year-from').addEventListener('change', () => {
+    state.yearFrom = parseInt(document.getElementById('year-from').value) || null;
+    state.page = 1;
+    updateAll();
+  });
+  document.getElementById('year-to').addEventListener('change', () => {
+    state.yearTo = parseInt(document.getElementById('year-to').value) || null;
+    state.page = 1;
+    updateAll();
+  });
+
+  // Private sector buttons
+  buildPrivateSectors();
+}
+
+function buildPrivateSectors() {
+  const { sectors, private_studies } = state.data;
+  const container = document.getElementById('private-sector-btns');
+
+  // Count private studies per sector
+  const sectorCounts = {};
+  private_studies.forEach(r => {
+    if (!r.keywords_clean) return;
+    r.keywords_clean.split('|').forEach(k => {
+      if (sectorCounts[k] === undefined) sectorCounts[k] = 0;
+      sectorCounts[k]++;
+    });
+  });
+
+  // All button
+  const allBtn = document.createElement('button');
+  allBtn.className = 'private-sector-btn active';
+  allBtn.dataset.sector = '';
+  allBtn.innerHTML = `All <span class="private-count">${private_studies.length}</span>`;
+  allBtn.onclick = () => setPrivateSector(null, allBtn);
+  container.appendChild(allBtn);
+
+  sectors.forEach(s => {
+    const count = sectorCounts[s.name] || 0;
+    if (count === 0) return;
+    const btn = document.createElement('button');
+    btn.className = 'private-sector-btn';
+    btn.dataset.sector = s.name;
+    btn.innerHTML = `${s.name.replace(/_/g,' ')} <span class="private-count">${count}</span>`;
+    btn.onclick = () => setPrivateSector(s.name, btn);
+    container.appendChild(btn);
+  });
+}
+
+// ── MAP ──────────────────────────────────────────────────────────────────────
+let projection, path, svg, g;
+const colorSteps = [0, 1, 5, 15, 30, 60, 100];
+const colorValues = ['var(--map-0)','var(--map-1)','var(--map-2)','var(--map-3)','var(--map-4)','var(--map-5)','var(--map-6)'];
+
+function getColor(count) {
+  if (!count || count === 0) return 'var(--map-0)';
+  for (let i = colorSteps.length - 1; i >= 0; i--) {
+    if (count >= colorSteps[i]) return colorValues[i];
+  }
+  return colorValues[0];
+}
+
+// Map country names from Natural Earth to our data
+const NAME_MAP = {
+  'United States of America': 'United States of America',
+  'United Kingdom': 'United Kingdom of Great Britain and Northern Ireland',
+  'Russia': 'Russia',
+  'South Korea': 'South Korea',
+  'North Korea': 'North Korea',
+  'Tanzania': 'Tanzania',
+  'Bolivia': 'Bolivia',
+  'Venezuela': 'Venezuela',
+  'Iran': 'Iran',
+  "Côte d'Ivoire": "Côte d'Ivoire",
+  'Ivory Coast': "Côte d'Ivoire",
+  'Vietnam': 'Vietnam',
+  'Laos': 'Laos',
+  'Czech Republic': 'Czechia',
+  'Czechia': 'Czechia',
+  'Macedonia': 'North Macedonia',
+  'North Macedonia': 'North Macedonia',
+  'Congo': 'Congo',
+  'Democratic Republic of the Congo': 'Democratic Republic of the Congo',
+  'DR Congo': 'Democratic Republic of the Congo',
+};
+
+function buildMap(topoData) {
+  const topojson = window.topojson || null;
+  const wrap = document.getElementById('map-wrap');
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+
+  svg = d3.select('#map-svg');
+  g = svg.append('g');
+
+  projection = d3.geoNaturalEarth1()
+    .scale(W / 6.5)
+    .translate([W / 2, H / 2]);
+
+  path = d3.geoPath().projection(projection);
+
+  // Fetch and render world
+  d3.json(GEO_URL).then(world => {
+    const countries = topojsonFeature(world);
+
+    g.selectAll('.country-path')
+      .data(countries.features)
+      .enter()
+      .append('path')
+      .attr('class', 'country-path')
+      .attr('d', path)
+      .attr('fill', 'var(--map-0)')
+      .on('mousemove', onCountryHover)
+      .on('mouseleave', onCountryLeave)
+      .on('click', onCountryClick);
+
+    buildLegend();
+  });
+
+  // Zoom
+  const zoom = d3.zoom()
+    .scaleExtent([0.8, 8])
+    .on('zoom', (e) => g.attr('transform', e.transform));
+  svg.call(zoom);
+
+  window.addEventListener('resize', () => {
+    const W2 = wrap.clientWidth, H2 = wrap.clientHeight;
+    projection.scale(W2 / 6.5).translate([W2 / 2, H2 / 2]);
+    g.selectAll('.country-path').attr('d', path);
+  });
+}
+
+function topojsonFeature(world) {
+  // Use topojson if available, else fall back to direct GeoJSON
+  if (typeof topojson !== 'undefined') {
+    return topojson.feature(world, world.objects.countries);
+  }
+  // Natural Earth 110m from world-atlas is topojson — need topojson lib
+  return { features: [] };
+}
+
+function resolveCountryName(geoName) {
+  if (!geoName) return null;
+  return NAME_MAP[geoName] || geoName;
+}
+
+function updateMap(filteredCounts) {
+  if (!g) return;
+  g.selectAll('.country-path')
+    .attr('fill', function(d) {
+      const geoName = d.properties && d.properties.name;
+      const name = resolveCountryName(geoName);
+      const count = filteredCounts[name] || 0;
+      return getColor(count);
+    })
+    .classed('selected', function(d) {
+      const geoName = d.properties && d.properties.name;
+      const name = resolveCountryName(geoName);
+      return name === state.selectedCountry;
+    });
+}
+
+function buildLegend() {
+  const rows = document.getElementById('legend-rows');
+  const labels = ['0', '1–4', '5–14', '15–29', '30–59', '60–99', '100+'];
+  colorValues.forEach((c, i) => {
+    const row = document.createElement('div');
+    row.className = 'legend-row';
+    row.innerHTML = `<div class="legend-swatch" style="background:${c}"></div><span class="legend-label">${labels[i]}</span>`;
+    rows.appendChild(row);
+  });
+}
+
+function onCountryHover(event, d) {
+  const geoName = d.properties && d.properties.name;
+  const name = resolveCountryName(geoName);
+  const agg = state.data.country_aggregates.find(c => c.country === name);
+  const filtered = getFilteredCountForCountry(name);
+
+  const tt = document.getElementById('tooltip');
+  document.getElementById('tooltip-country').textContent = name || geoName || '—';
+  document.getElementById('tooltip-count').textContent = `RCTs (filtered): ${filtered}`;
+  document.getElementById('tooltip-breakdown').innerHTML = agg
+    ? `Total: ${agg.rct_count} | Completed: ${agg.completed_count} | Ongoing: ${agg.ongoing_count}`
+    : 'No data';
+
+  tt.style.left = (event.clientX + 14) + 'px';
+  tt.style.top  = (event.clientY - 10) + 'px';
+  tt.classList.add('visible');
+}
+
+function onCountryLeave() {
+  document.getElementById('tooltip').classList.remove('visible');
+}
+
+function onCountryClick(event, d) {
+  const geoName = d.properties && d.properties.name;
+  const name = resolveCountryName(geoName);
+  if (!name) return;
+  if (state.selectedCountry === name) {
+    clearCountryFilter();
+  } else {
+    state.selectedCountry = name;
+    state.page = 1;
+    const badge = document.getElementById('country-badge');
+    badge.classList.add('visible');
+    document.getElementById('country-name-label').textContent = `[ ${name} ]`;
+    updateAll();
+  }
+}
+
+function clearCountryFilter() {
+  state.selectedCountry = null;
+  document.getElementById('country-badge').classList.remove('visible');
+  state.page = 1;
+  updateAll();
+}
+
+// ── FILTERS ──────────────────────────────────────────────────────────────────
+function toggleSector(sector) {
+  if (state.selectedSectors.has(sector)) {
+    state.selectedSectors.delete(sector);
+  } else {
+    state.selectedSectors.add(sector);
+  }
+  state.page = 1;
+  document.querySelectorAll('.sector-chip').forEach(c => {
+    c.classList.toggle('active', state.selectedSectors.has(c.dataset.sector));
+  });
+  updateAll();
+}
+
+function toggleStatus(status) {
+  if (state.selectedStatuses.has(status)) {
+    state.selectedStatuses.delete(status);
+  } else {
+    state.selectedStatuses.add(status);
+  }
+  state.page = 1;
+  const check = document.getElementById(`check-${status}`);
+  if (check) check.classList.toggle('checked', state.selectedStatuses.has(status));
+  updateAll();
+}
+
+function resetFilters() {
+  state.selectedSectors.clear();
+  state.selectedStatuses = new Set(['completed', 'on_going', 'in_development', 'withdrawn', 'abandoned']);
+  state.selectedCountry = null;
+  state.yearFrom = null;
+  state.yearTo = null;
+  state.searchQuery = '';
+  state.investigatorQuery = '';
+  state.institutionQuery = '';
+  state.page = 1;
+  document.getElementById('year-from').value = '';
+  document.getElementById('year-to').value = '';
+  document.getElementById('search-input').value = '';
+  document.getElementById('investigator-input').value = '';
+  document.getElementById('institution-input').value = '';
+  document.getElementById('inv-dropdown').style.display = 'none';
+  document.getElementById('inst-dropdown').style.display = 'none';
+  document.getElementById('country-badge').classList.remove('visible');
+  document.querySelectorAll('.sector-chip').forEach(c => c.classList.remove('active'));
+  document.querySelectorAll('.status-check').forEach(c => c.classList.add('checked'));
+  updateAll();
+}
+
+function onSearch() {
+  state.searchQuery = document.getElementById('search-input').value.toLowerCase();
+  state.page = 1;
+  updateAll();
+}
+
+// ── INVESTIGATOR + INSTITUTION AUTOCOMPLETE ───────────────────────────────────
+
+// Domain → institution lookup
+const DOMAIN_MAP = {
+  'berkeley.edu':'UC Berkeley','econ.berkeley.edu':'UC Berkeley','haas.berkeley.edu':'UC Berkeley',
+  'worldbank.org':'World Bank',
+  'stanford.edu':'Stanford University',
+  'mit.edu':'MIT','alum.mit.edu':'MIT',
+  'uchicago.edu':'University of Chicago','chicagobooth.edu':'University of Chicago',
+  'umich.edu':'University of Michigan',
+  'yale.edu':'Yale University',
+  'g.harvard.edu':'Harvard University','fas.harvard.edu':'Harvard University',
+  'hbs.edu':'Harvard University','hsph.harvard.edu':'Harvard University',
+  'hks.harvard.edu':'Harvard University','post.harvard.edu':'Harvard University',
+  'law.harvard.edu':'Harvard University',
+  'columbia.edu':'Columbia University','tc.columbia.edu':'Columbia University',
+  'nyu.edu':'NYU',
+  'cornell.edu':'Cornell University',
+  'cgiar.org':'CGIAR',
+  'lse.ac.uk':'LSE',
+  'nhh.no':'NHH Norwegian School of Economics',
+  'warwick.ac.uk':'University of Warwick',
+  'nd.edu':'Notre Dame',
+  'ucsd.edu':'UC San Diego',
+  'iadb.org':'IDB',
+  'tamu.edu':'Texas A&M',
+  'princeton.edu':'Princeton University',
+  'mdrc.org':'MDRC',
+  'wiso.uni-koeln.de':'University of Cologne','uni-koeln.de':'University of Cologne','smail.uni-koeln.de':'University of Cologne',
+  'econ.uzh.ch':'University of Zurich','uzh.ch':'University of Zurich',
+  'unibocconi.it':'Bocconi University',
+  'uni-hamburg.de':'University of Hamburg',
+  'duke.edu':'Duke University',
+  'ifo.de':'ifo Institute',
+  'monash.edu':'Monash University',
+  'virginia.edu':'University of Virginia',
+  'ese.eur.nl':'Erasmus University Rotterdam',
+  'brown.edu':'Brown University',
+  'econ.ku.dk':'University of Copenhagen',
+  'rwi-essen.de':'RWI Essen',
+  'poverty-action.org':'IPA','povertyactionlab.org':'J-PAL',
+  'pitt.edu':'University of Pittsburgh',
+  'economics.ox.ac.uk':'Oxford University','bsg.ox.ac.uk':'Oxford University',
+  'qeh.ox.ac.uk':'Oxford University','nuffield.ox.ac.uk':'Oxford University',
+  'uci.edu':'UC Irvine',
+  'wharton.upenn.edu':'Wharton / UPenn','sas.upenn.edu':'UPenn',
+  'mathematica-mpr.com':'Mathematica',
+  'wisc.edu':'University of Wisconsin',
+  'ucdavis.edu':'UC Davis',
+  'utoronto.ca':'University of Toronto','mail.utoronto.ca':'University of Toronto',
+  'maastrichtuniversity.nl':'Maastricht University',
+  'bu.edu':'Boston University',
+  'tum.de':'TU Munich',
+  'econ.lmu.de':'LMU Munich','lmu.de':'LMU Munich',
+  'ucl.ac.uk':'UCL',
+  'uni-mannheim.de':'University of Mannheim',
+  'sciencespo.fr':'Sciences Po',
+  'bi.team':'Behavioural Insights Team','behaviouralinsights.co.uk':'Behavioural Insights Team',
+  'uni-bonn.de':'University of Bonn',
+  'tcd.ie':'Trinity College Dublin',
+  'tse-fr.eu':'Toulouse School of Economics',
+  'nus.edu.sg':'NUS Singapore',
+  'uni-goettingen.de':'University of Göttingen',
+  'rug.nl':'University of Groningen',
+  'diw.de':'DIW Berlin',
+  'novasbe.pt':'Nova SBE',
+  'eui.eu':'European University Institute',
+  'purdue.edu':'Purdue University',
+  'uoregon.edu':'University of Oregon',
+  'uni-konstanz.de':'University of Konstanz',
+  'northwestern.edu':'Northwestern University','u.northwestern.edu':'Northwestern University',
+  'hsph.harvard.edu':'Harvard T.H. Chan',
+  'georgetown.edu':'Georgetown University',
+  'tufts.edu':'Tufts University',
+  'vanderbilt.edu':'Vanderbilt University',
+  'economics.gu.se':'University of Gothenburg',
+  'andrew.cmu.edu':'Carnegie Mellon','caltech.edu':'Caltech',
+  'iies.su.se':'Stockholm University',
+  'uis.no':'University of Stavanger',
+  'cam.ac.uk':'Cambridge University',
+  'zew.de':'ZEW Mannheim',
+  'ethz.ch':'ETH Zurich',
+  'kuleuven.be':'KU Leuven',
+  'kcl.ac.uk':'King\'s College London',
+  'pku.edu.cn':'Peking University',
+  'ashoka.edu.in':'Ashoka University',
+  'umn.edu':'University of Minnesota',
+  'umd.edu':'University of Maryland',
+  'psemail.eu':'Paris School of Economics',
+  'bristol.ac.uk':'University of Bristol',
+  'graduateinstitute.ch':'Graduate Institute Geneva',
+  'hhs.se':'Stockholm School of Economics',
+  'econ.uio.no':'University of Oslo',
+  'msu.edu':'Michigan State University',
+  'jhu.edu':'Johns Hopkins University',
+  'mcgill.ca':'McGill University',
+  'popcouncil.org':'Population Council',
+  'dartmouth.edu':'Dartmouth College',
+  'fgv.br':'FGV Brazil',
+  'uga.edu':'University of Georgia',
+  'essex.ac.uk':'University of Essex',
+  'exeter.ac.uk':'University of Exeter',
+  'iab.de':'IAB Germany',
+  'coll.mpg.de':'Max Planck Institute',
+  'uea.ac.uk':'University of East Anglia',
+  'gwu.edu':'George Washington University',
+  'nottingham.ac.uk':'University of Nottingham',
+  'imperial.ac.uk':'Imperial College London',
+  'uni-mainz.de':'University of Mainz',
+  'uni-passau.de':'University of Passau',
+  'tilburguniversity.edu':'Tilburg University',
+  'hu-berlin.de':'Humboldt University Berlin',
+  'idinsight.org':'IDinsight',
+  'rand.org':'RAND Corporation',
+  'unil.ch':'University of Lausanne',
+  'lshtm.ac.uk':'London School of Hygiene',
+  'ubc.ca':'University of British Columbia',
+  'cerge-ei.cz':'CERGE-EI',
+  'unimelb.edu.au':'University of Melbourne',
+  'anu.edu.au':'ANU','unsw.edu.au':'UNSW','sydney.edu.au':'University of Sydney',
+  'ucla.edu':'UCLA','usc.edu':'USC','ucsb.edu':'UC Santa Barbara',
+  'uniandes.edu.co':'Universidad de los Andes',
+  'itam.mx':'ITAM Mexico',
+  'ntu.edu.tw':'NTU Taiwan',
+  'ifmr.ac.in':'IFMR India',
+  'vatt.fi':'VATT Finland',
+  'wustl.edu':'Washington University St. Louis',
+  'gsa.gov':'US GSA',
+};
+
+const PERSONAL_DOMAINS = new Set([
+  'gmail.com','yahoo.com','hotmail.com','outlook.com','googlemail.com',
+  'me.com','163.com','icloud.com','live.com','msn.com','aol.com'
+]);
+
+function stripEmail(raw) {
+  return (raw || '').replace(/\S+@\S+/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function extractInstitution(raw) {
+  if (!raw) return null;
+  const match = raw.match(/[\w.+-]+@([\w.-]+)/);
+  if (!match) return null;
+  const domain = match[1].toLowerCase();
+  if (PERSONAL_DOMAINS.has(domain)) return null;
+  // Check full domain and subdomains
+  const parts = domain.split('.');
+  for (let i = 0; i < parts.length - 1; i++) {
+    const sub = parts.slice(i).join('.');
+    if (DOMAIN_MAP[sub]) return DOMAIN_MAP[sub];
+  }
+  // Fallback: capitalise main domain
+  return null;
+}
+
+let allInvestigators = [];
+let allInstitutions  = [];
+let allPrivateInvestigators = [];
+let allPrivateInstitutions  = [];
+
+function buildInvestigatorList() {
+  const invSeen  = new Set();
+  const instSeen = new Set();
+  const privInvSeen  = new Set();
+  const privInstSeen = new Set();
+
+  // Country studies
+  state.data.country_studies.forEach(r => {
+    if (!r.investigator) return;
+    const name = stripEmail(r.investigator);
+    if (name) invSeen.add(name);
+    const inst = extractInstitution(r.investigator);
+    if (inst) instSeen.add(inst);
+    // Store institution on record for filtering
+    r._institution = inst || null;
+    r._name_clean  = name;
+  });
+
+  // Private studies
+  state.data.private_studies.forEach(r => {
+    if (!r.investigator) return;
+    const name = stripEmail(r.investigator);
+    if (name) privInvSeen.add(name);
+    const inst = extractInstitution(r.investigator);
+    if (inst) privInstSeen.add(inst);
+    r._institution = inst || null;
+    r._name_clean  = name;
+  });
+
+  allInvestigators = [...invSeen].sort((a,b) => a.localeCompare(b));
+  allInstitutions  = [...instSeen].sort((a,b) => a.localeCompare(b));
+  allPrivateInvestigators = [...privInvSeen].sort((a,b) => a.localeCompare(b));
+  allPrivateInstitutions  = [...privInstSeen].sort((a,b) => a.localeCompare(b));
+}
+
+// Generic autocomplete renderer
+function renderDropdown(dropdownId, matches, q, onSelect) {
+  const dropdown = document.getElementById(dropdownId);
+  if (!matches.length) { dropdown.style.display = 'none'; return; }
+  dropdown.innerHTML = matches.map(name => {
+    const highlighted = name.replace(
+      new RegExp(`(\\b)(${q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi'),
+      '$1<span style="color:var(--accent);font-weight:700;">$2</span>'
+    );
+    return `<div onmousedown="${onSelect}('${name.replace(/'/g,"\\'")}')"
+      style="padding:7px 12px;font-family:var(--mono);font-size:10px;color:var(--text2);cursor:pointer;letter-spacing:0.04em;border-bottom:1px solid var(--border);"
+      onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''"
+    >${highlighted}</div>`;
+  }).join('');
+  dropdown.style.display = 'block';
+}
+
+function wordStartsWith(name, q) {
+  return name.toLowerCase().split(/\s+/).some(w => w.startsWith(q));
+}
+
+// ── COUNTRY: INVESTIGATOR ──
+function onInvestigatorSearch() {
+  const q = document.getElementById('investigator-input').value;
+  state.investigatorQuery = q.toLowerCase();
+  state.page = 1;
+  updateAll();
+  if (q.length > 0) {
+    const matches = allInvestigators.filter(n => wordStartsWith(n, q.toLowerCase())).slice(0,12);
+    renderDropdown('inv-dropdown', matches, q, 'selectInvestigator');
+  } else {
+    document.getElementById('inv-dropdown').style.display = 'none';
+  }
+}
+function selectInvestigator(name) {
+  document.getElementById('investigator-input').value = name;
+  state.investigatorQuery = name.toLowerCase();
+  state.page = 1;
+  document.getElementById('inv-dropdown').style.display = 'none';
+  updateAll();
+}
+function showInvDropdown() { onInvestigatorSearch(); }
+function hideInvDropdown() { setTimeout(() => { document.getElementById('inv-dropdown').style.display = 'none'; }, 150); }
+
+// ── COUNTRY: INSTITUTION ──
+function onInstitutionSearch() {
+  const q = document.getElementById('institution-input').value;
+  state.institutionQuery = q.toLowerCase();
+  state.page = 1;
+  updateAll();
+  if (q.length > 0) {
+    const matches = allInstitutions.filter(n => wordStartsWith(n, q.toLowerCase())).slice(0,12);
+    renderDropdown('inst-dropdown', matches, q, 'selectInstitution');
+  } else {
+    document.getElementById('inst-dropdown').style.display = 'none';
+  }
+}
+function selectInstitution(name) {
+  document.getElementById('institution-input').value = name;
+  state.institutionQuery = name.toLowerCase();
+  state.page = 1;
+  document.getElementById('inst-dropdown').style.display = 'none';
+  updateAll();
+}
+function showInstDropdown() { onInstitutionSearch(); }
+function hideInstDropdown() { setTimeout(() => { document.getElementById('inst-dropdown').style.display = 'none'; }, 150); }
+
+// ── PRIVATE: INVESTIGATOR ──
+function onPrivateInvSearch() {
+  const q = document.getElementById('private-investigator-input').value;
+  state.privateInvQuery = q.toLowerCase();
+  state.privatePage = 1;
+  updatePrivate();
+  if (q.length > 0) {
+    const matches = allPrivateInvestigators.filter(n => wordStartsWith(n, q.toLowerCase())).slice(0,12);
+    renderDropdown('private-inv-dropdown', matches, q, 'selectPrivateInvestigator');
+  } else {
+    document.getElementById('private-inv-dropdown').style.display = 'none';
+  }
+}
+function selectPrivateInvestigator(name) {
+  document.getElementById('private-investigator-input').value = name;
+  state.privateInvQuery = name.toLowerCase();
+  state.privatePage = 1;
+  document.getElementById('private-inv-dropdown').style.display = 'none';
+  updatePrivate();
+}
+function showPrivateInvDropdown() { onPrivateInvSearch(); }
+function hidePrivateInvDropdown() { setTimeout(() => { document.getElementById('private-inv-dropdown').style.display = 'none'; }, 150); }
+
+// ── PRIVATE: INSTITUTION ──
+function onPrivateInstSearch() {
+  const q = document.getElementById('private-institution-input').value;
+  state.privateInstQuery = q.toLowerCase();
+  state.privatePage = 1;
+  updatePrivate();
+  if (q.length > 0) {
+    const matches = allPrivateInstitutions.filter(n => wordStartsWith(n, q.toLowerCase())).slice(0,12);
+    renderDropdown('private-inst-dropdown', matches, q, 'selectPrivateInstitution');
+  } else {
+    document.getElementById('private-inst-dropdown').style.display = 'none';
+  }
+}
+function selectPrivateInstitution(name) {
+  document.getElementById('private-institution-input').value = name;
+  state.privateInstQuery = name.toLowerCase();
+  state.privatePage = 1;
+  document.getElementById('private-inst-dropdown').style.display = 'none';
+  updatePrivate();
+}
+function showPrivateInstDropdown() { onPrivateInstSearch(); }
+function hidePrivateInstDropdown() { setTimeout(() => { document.getElementById('private-inst-dropdown').style.display = 'none'; }, 150); }
+
+// ── THEME TOGGLE ─────────────────────────────────────────────────────────────
+let isLight = false;
+const LIGHT = {
+  '--bg': '#f5f5f0', '--bg2': '#eeede8', '--bg3': '#e5e4de',
+  '--border': '#d0cfc8', '--border2': '#b8b7b0',
+  '--text': '#1a1a18', '--text2': '#4a4a44', '--text3': '#8a8a80',
+  '--accent': '#1a7a5e', '--accent2': '#0f5c44',
+  '--map-0': '#dde8e4', '--map-1': '#b8d4cc', '--map-2': '#8abfb3',
+  '--map-3': '#5ca99a', '--map-4': '#2e9484', '--map-5': '#1a7a6a',
+  '--map-6': '#0a5a4e',
+};
+const DARK = {
+  '--bg': '#0e0f11', '--bg2': '#141518', '--bg3': '#1c1e22',
+  '--border': '#2a2d33', '--border2': '#383c44',
+  '--text': '#e8e9eb', '--text2': '#8a8f9a', '--text3': '#555b66',
+  '--accent': '#7fffd4', '--accent2': '#3dd9ac',
+  '--map-0': '#1c1e22', '--map-1': '#1a3a35', '--map-2': '#1e5c4e',
+  '--map-3': '#237d69', '--map-4': '#29a084', '--map-5': '#2ec4a0',
+  '--map-6': '#7fffd4',
+};
+function toggleTheme() {
+  isLight = !isLight;
+  const theme = isLight ? LIGHT : DARK;
+  const root = document.documentElement;
+  Object.entries(theme).forEach(([k, v]) => root.style.setProperty(k, v));
+  document.getElementById('theme-toggle').textContent = isLight ? '◑' : '◐';
+  if (g) g.selectAll('.country-path').attr('stroke', isLight ? '#b8b7b0' : '#2a2d33');
+}
+
+// ── SECTOR CHIP COUNT UPDATE ──────────────────────────────────────────────────
+function updateSectorChipCounts(filtered) {
+  // Count per sector in current filtered set (ignoring sector filter itself)
+  const filteredNoSector = applyFiltersExceptSector(state.data.country_studies);
+  const sectorCounts = {};
+  filteredNoSector.forEach(r => {
+    if (!r.keywords_clean) return;
+    r.keywords_clean.split('|').forEach(k => {
+      sectorCounts[k] = (sectorCounts[k] || 0) + 1;
+    });
+  });
+  document.querySelectorAll('.sector-chip').forEach(chip => {
+    const sector = chip.dataset.sector;
+    const count = sectorCounts[sector] || 0;
+    const countEl = chip.querySelector('.chip-count');
+    if (countEl) countEl.textContent = count;
+  });
+}
+
+function applyFiltersExceptSector(records) {
+  return records.filter(r => {
+    if (!state.selectedStatuses.has(r.status)) return false;
+    if (state.yearFrom || state.yearTo) {
+      const yr = r.registered_on ? parseInt(r.registered_on.slice(0,4)) : null;
+      if (yr) {
+        if (state.yearFrom && yr < state.yearFrom) return false;
+        if (state.yearTo   && yr > state.yearTo)   return false;
+      }
+    }
+    if (state.selectedCountry && r.country !== state.selectedCountry) return false;
+    if (state.searchQuery) {
+      const q = state.searchQuery;
+      if (!(r.title && r.title.toLowerCase().includes(q)) &&
+          !(r.RCT_ID && r.RCT_ID.toLowerCase().includes(q))) return false;
+    }
+    if (state.investigatorQuery) {
+      const name = stripEmail(r.investigator || '').toLowerCase();
+      const nameWords = name.split(/\s+/);
+      const queryWords = state.investigatorQuery.trim().split(/\s+/);
+      if (!queryWords.every(qw => nameWords.some(w => w.startsWith(qw)))) return false;
+    }
+    if (state.institutionQuery) {
+      const q = state.institutionQuery;
+      const inst = (r._institution || extractInstitution(r.investigator || '') || '').toLowerCase();
+      if (!inst.split(/\s+/).some(w => w.startsWith(q))) return false;
+    }
+    return true;
+  });
+}
+
+function setMode(mode) {
+  state.mode = mode;
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  document.getElementById('country-view').style.display = mode === 'country' ? 'flex' : 'none';
+  const pv = document.getElementById('private-view');
+  pv.classList.toggle('visible', mode === 'private');
+  if (mode === 'private') updatePrivate();
+}
+
+// ── FILTER LOGIC ─────────────────────────────────────────────────────────────
+function applyFilters(records) {
+  return records.filter(r => {
+    // Status
+    if (!state.selectedStatuses.has(r.status)) return false;
+    // Year
+    if (state.yearFrom || state.yearTo) {
+      const yr = r.registered_on ? parseInt(r.registered_on.slice(0,4)) : null;
+      if (yr) {
+        if (state.yearFrom && yr < state.yearFrom) return false;
+        if (state.yearTo   && yr > state.yearTo)   return false;
+      }
+    }
+    // Sector
+    if (state.selectedSectors.size > 0) {
+      const kws = r.keywords_clean ? r.keywords_clean.split('|') : [];
+      const hasMatch = [...state.selectedSectors].some(s => kws.includes(s));
+      if (!hasMatch) return false;
+    }
+    // Country
+    if (state.selectedCountry) {
+      if (r.country !== state.selectedCountry) return false;
+    }
+    // Search
+    if (state.searchQuery) {
+      const q = state.searchQuery;
+      const inTitle = r.title && r.title.toLowerCase().includes(q);
+      const inId    = r.RCT_ID && r.RCT_ID.toLowerCase().includes(q);
+      if (!inTitle && !inId) return false;
+    }
+    // Investigator — split query into words, each must match start of some name word
+    if (state.investigatorQuery) {
+      const name = stripEmail(r.investigator || '').toLowerCase();
+      const nameWords = name.split(/\s+/);
+      const queryWords = state.investigatorQuery.trim().split(/\s+/);
+      const allMatch = queryWords.every(qw => nameWords.some(w => w.startsWith(qw)));
+      if (!allMatch) return false;
+    }
+    // Institution
+    if (state.institutionQuery) {
+      const q = state.institutionQuery;
+      const inst = (r._institution || extractInstitution(r.investigator || '') || '').toLowerCase();
+      if (!inst.split(/\s+/).some(w => w.startsWith(q))) return false;
+    }
+    return true;
+  });
+}
+
+function getFilteredCountForCountry(countryName) {
+  if (!state.data) return 0;
+  // Temporarily set country filter to this country
+  const saved = state.selectedCountry;
+  state.selectedCountry = countryName;
+  const count = applyFilters(state.data.country_studies).length;
+  state.selectedCountry = saved;
+  return count;
+}
+
+// ── UPDATE ───────────────────────────────────────────────────────────────────
+function updateAll() {
+  if (!state.data) return;
+  const filtered = applyFilters(state.data.country_studies);
+
+  // Compute per-country counts
+  const countryFilterCounts = {};
+  filtered.forEach(r => {
+    countryFilterCounts[r.country] = (countryFilterCounts[r.country] || 0) + 1;
+  });
+
+  updateMap(countryFilterCounts);
+  updateCountBar(filtered, countryFilterCounts);
+  updateSectorChipCounts(filtered);
+  updateTable(filtered);
+}
+
+function updateCountBar(filtered, countryFilterCounts) {
+  document.getElementById('bar-showing').textContent = filtered.length.toLocaleString();
+  document.getElementById('bar-countries').textContent = Object.keys(countryFilterCounts).length;
+  const multi = filtered.filter(r => r.is_multi_country).length;
+  document.getElementById('bar-multi').textContent = multi;
+}
+
+// ── TABLE ────────────────────────────────────────────────────────────────────
+function updateTable(filtered) {
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / state.pageSize));
+  state.page = Math.min(state.page, totalPages);
+
+  const start = (state.page - 1) * state.pageSize;
+  const pageData = filtered.slice(start, start + state.pageSize);
+
+  document.getElementById('table-count-label').textContent = `${total.toLocaleString()} RESULTS`;
+  document.getElementById('page-info').textContent = `Page ${state.page} of ${totalPages}`;
+  document.getElementById('prev-btn').disabled = state.page <= 1;
+  document.getElementById('next-btn').disabled = state.page >= totalPages;
+
+  const scroll = document.getElementById('table-scroll');
+  if (pageData.length === 0) {
+    scroll.innerHTML = `<div class="empty-state"><div class="empty-state-icon">∅</div><div class="empty-state-text">No results found.<br>Try adjusting filters.</div></div>`;
+    return;
+  }
+
+  scroll.innerHTML = '';
+  pageData.forEach(r => {
+    const row = buildRow(r, false);
+    scroll.appendChild(row);
+  });
+}
+
+function buildRow(r, isPrivate) {
+  const div = document.createElement('div');
+  div.className = 'rct-row';
+  div.dataset.id = r.RCT_ID_duplicates;
+
+  const kws = r.keywords_clean ? r.keywords_clean.split('|').slice(0, 4) : [];
+  const kwTags = kws.map(k => `<span class="meta-tag">${k}</span>`).join('');
+  const year = r.registered_on ? r.registered_on.slice(0,4) : '—';
+  const location = isPrivate ? '' : `<span class="meta-tag">${r.country || '—'}</span>`;
+
+  div.innerHTML = `
+    <div class="rct-id">
+      ${r.RCT_ID}
+      ${r.is_multi_country ? '<span class="meta-tag" style="border-color:#4a6b3a;color:#8abf5a;">Multi</span>' : ''}
+      ${r.is_online ? '<span class="meta-tag" style="border-color:#2a4a6b;color:#5a8abf;">Online</span>' : ''}
+    </div>
+    <div class="rct-title">${r.title || '—'}</div>
+    <div class="rct-meta">
+      <span class="meta-tag ${r.status}">${(r.status || '—').replace(/_/g,' ').toUpperCase()}</span>
+      ${location}
+      <span class="meta-tag">${year}</span>
+      ${kwTags}
+    </div>
+    <div class="rct-detail">
+      <div class="detail-row">
+        <span class="detail-key">Investigator</span>
+        <span class="detail-val">${r.investigator || '—'}</span>
+      </div>
+      ${!isPrivate ? `<div class="detail-row">
+        <span class="detail-key">Region</span>
+        <span class="detail-val">${r.region_detail && r.region_detail !== 'No additional info' ? r.region_detail : '—'}</span>
+      </div>` : ''}
+      <div class="detail-row">
+        <span class="detail-key">Dates</span>
+        <span class="detail-val">${r.start_date || '—'} → ${r.end_date || '—'}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-key">Registered</span>
+        <span class="detail-val">${r.registered_on || '—'}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-key">DOI</span>
+        <span class="detail-val">${r.doi ? `<a href="https://doi.org/${r.doi}" target="_blank">${r.doi}</a>` : '—'}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-key">Registry</span>
+        <span class="detail-val">${r.url ? `<a href="${r.url}" target="_blank">[ VIEW_ON_AEA ]</a>` : '—'}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-key">Keywords</span>
+        <div class="detail-val"><div class="kw-list">${
+          (r.keywords_clean || '').split('|').filter(Boolean).map(k => `<span class="kw-tag">${k}</span>`).join('')
+        }</div></div>
+      </div>
+    </div>`;
+
+  div.addEventListener('click', () => {
+    const isExpanded = div.classList.contains('expanded');
+    document.querySelectorAll('.rct-row.expanded').forEach(el => el.classList.remove('expanded'));
+    if (!isExpanded) div.classList.add('expanded');
+  });
+
+  return div;
+}
+
+function changePage(dir) {
+  state.page += dir;
+  updateAll();
+  document.getElementById('table-scroll').scrollTop = 0;
+}
+
+// ── PRIVATE MODE ─────────────────────────────────────────────────────────────
+function setPrivateSector(sector, btn) {
+  state.privateSelectedSector = sector;
+  state.privatePage = 1;
+  document.querySelectorAll('.private-sector-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  updatePrivate();
+}
+
+function onPrivateSearch() {
+  state.privateSearch = document.getElementById('private-search').value.toLowerCase();
+  state.privatePage = 1;
+  updatePrivate();
+}
+
+function updatePrivate() {
+  if (!state.data) return;
+  let records = state.data.private_studies;
+
+  if (state.privateSelectedSector) {
+    records = records.filter(r => {
+      const kws = r.keywords_clean ? r.keywords_clean.split('|') : [];
+      return kws.includes(state.privateSelectedSector);
+    });
+  }
+
+  if (state.privateSearch) {
+    const q = state.privateSearch;
+    records = records.filter(r =>
+      (r.title && r.title.toLowerCase().includes(q)) ||
+      (r.RCT_ID && r.RCT_ID.toLowerCase().includes(q))
+    );
+  }
+
+  if (state.privateInvQuery) {
+    const q = state.privateInvQuery;
+    records = records.filter(r => {
+      const name = stripEmail(r.investigator || '').toLowerCase();
+      const nameWords = name.split(/\s+/);
+      const queryWords = q.trim().split(/\s+/);
+      return queryWords.every(qw => nameWords.some(w => w.startsWith(qw)));
+    });
+  }
+
+  if (state.privateInstQuery) {
+    const q = state.privateInstQuery;
+    records = records.filter(r => {
+      const inst = (r._institution || extractInstitution(r.investigator || '') || '').toLowerCase();
+      return inst.split(/\s+/).some(w => w.startsWith(q));
+    });
+  }
+
+  const total = records.length;
+  const totalPages = Math.max(1, Math.ceil(total / state.pageSize));
+  state.privatePage = Math.min(state.privatePage, totalPages);
+  const start = (state.privatePage - 1) * state.pageSize;
+  const pageData = records.slice(start, start + state.pageSize);
+
+  document.getElementById('private-count-label').textContent = `${total.toLocaleString()} RESULTS`;
+  document.getElementById('private-page-info').textContent = `Page ${state.privatePage} of ${totalPages}`;
+  document.getElementById('private-prev-btn').disabled = state.privatePage <= 1;
+  document.getElementById('private-next-btn').disabled = state.privatePage >= totalPages;
+
+  const scroll = document.getElementById('private-table-scroll');
+  scroll.innerHTML = '';
+  if (pageData.length === 0) {
+    scroll.innerHTML = `<div class="empty-state"><div class="empty-state-icon">∅</div><div class="empty-state-text">No results found.</div></div>`;
+    return;
+  }
+  pageData.forEach(r => scroll.appendChild(buildRow(r, true)));
+}
+
+function changePrivatePage(dir) {
+  state.privatePage += dir;
+  updatePrivate();
+  document.getElementById('private-table-scroll').scrollTop = 0;
+}
+
+// ── TOPOJSON (inline minimal) ─────────────────────────────────────────────────
+// We load topojson from CDN
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<script>
+// Override topojsonFeature now that topojson is loaded
+function topojsonFeature(world) {
+  return topojson.feature(world, world.objects.countries);
+}
+// Start
+init();
+</script>
+</body>
+</html>
